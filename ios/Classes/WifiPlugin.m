@@ -75,7 +75,7 @@
     UIApplication *app = [UIApplication sharedApplication];
     NSArray *subviews = [[[app valueForKey:@"statusBar"] valueForKey:@"foregroundView"] subviews];
     UIView *dataNetworkItemView = nil;
-    
+
     for (UIView * subview in subviews) {
         if([subview isKindOfClass:[NSClassFromString(@"UIStatusBarDataNetworkItemView") class]]) {
             dataNetworkItemView = subview;
