@@ -2,3 +2,4 @@
 
 @interface WifiPlugin : NSObject<FlutterPlugin>
 @end
+
