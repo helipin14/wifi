@@ -32,6 +32,10 @@ class Wifi {
     return resultList;
   }
 
+  static Future<bool> getMobileDataStatus() async {
+    return await _channel.invokeMethod("getMobileDataStatus");
+  }
+
   static Future<String> getListESP() async {
     String result = await _channel.invokeMethod("getListESP");
     if(result != null) {
