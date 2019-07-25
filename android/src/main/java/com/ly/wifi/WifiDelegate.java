@@ -55,6 +55,8 @@ import com.google.android.gms.location.LocationSettingsResult;
 import com.google.android.gms.location.LocationSettingsStatusCodes;
 import android.location.LocationManager;
 import android.content.IntentSender;
+import android.telephony.TelephonyManager;
+import java.lang.reflect.Method;
 
 public class WifiDelegate implements PluginRegistry.RequestPermissionsResultListener, PluginRegistry.ActivityResultListener, ResultCallback {
     private Activity activity;
@@ -62,12 +64,14 @@ public class WifiDelegate implements PluginRegistry.RequestPermissionsResultList
     private PermissionManager permissionManager;
     private static final int REQUEST_ACCESS_FINE_LOCATION_PERMISSION = 1;
     private static final int REQUEST_CHANGE_WIFI_STATE_PERMISSION = 2;
+    private static final int REQUEST_CHANGE_MODIFY_PHONE_STATE = 500;
     NetworkChangeReceiver networkReceiver;
     private String TAG = this.getClass().getSimpleName();
     private static final int REQUEST_ACCESS_COARSE_LOCATION_PERMISSION = 3;
     private ScanResultReceiver receiver;
     private WifiInfo info;
     private static final int REQUEST_CHECK = 100;
+    private static final int REQUEST_MOBILE_DATA = 200;
     private ConnectivityManager connectivityManager;
     private BroadcastReceiver wifiReceiver;
     private int count = 0;
@@ -540,6 +544,38 @@ public class WifiDelegate implements PluginRegistry.RequestPermissionsResultList
             }
     }
 
+    public void getMobileDataStatus(MethodCall methodCall, MethodChannel.Result result) {
+        if (!setPendingMethodCallAndResult(methodCall, result)) {
+            finishWithAlreadyActiveError();
+            return;
+        }
+        // if (!permissionManager.isPermissionGranted(Manifest.permission.MODIFY_PHONE_STATE)) {
+        //     Log.e("MobileStatus", "Requesting permission...");
+        //     permissionManager.askForPermission(Manifest.permission.MODIFY_PHONE_STATE, REQUEST_CHANGE_MODIFY_PHONE_STATE);
+        //     return;
+        // }
+        // Log.e("MobileStatus", "Getting mobile data status....");
+        // getMobileDataState();
+        Log.e("MobileStatus", "Getting mobile data status....");
+        getMobileDataState();
+        // if(permissionManager.isPermissionGranted(Manifest.permission.MODIFY_PHONE_STATE)) {
+        // }
+    }
+
+    private void getMobileDataState() {
+        try {
+            TelephonyManager telephonyService = (TelephonyManager) activity.getApplicationContext().getSystemService(Context.TELEPHONY_SERVICE);
+            Method getMobileDataEnabledMethod = telephonyService.getClass().getDeclaredMethod("getDataEnabled");
+            if (null != getMobileDataEnabledMethod) {
+                boolean mobileDataEnabled = (Boolean) getMobileDataEnabledMethod.invoke(telephonyService);
+                result.success(mobileDataEnabled);
+            }
+        } catch (Exception ex) {
+            Log.e(TAG, "Error getting mobile data state", ex);
+        }
+        clearMethodCallAndResult();
+    }
+
     private void disableAllNetwork(String curSSID) {
         if(wifiManager != null) {
             List<WifiConfiguration> config = wifiManager.getConfiguredNetworks();
@@ -736,6 +772,9 @@ public class WifiDelegate implements PluginRegistry.RequestPermissionsResultList
                     connection();
                 }
                 break;
+            case REQUEST_CHANGE_MODIFY_PHONE_STATE:
+                if(permissionGranted) getMobileDataState();
+                break;
             default:
                 return false;
         }
@@ -790,6 +829,9 @@ public class WifiDelegate implements PluginRegistry.RequestPermissionsResultList
                         }
                     }
                 }
+                break;
+            case REQUEST_MOBILE_DATA:
+                //
                 break;
             default:
                 //

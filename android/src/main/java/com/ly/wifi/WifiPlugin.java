@@ -52,6 +52,9 @@ public class WifiPlugin implements MethodCallHandler {
             case "level":
                 delegate.getLevel(call, result);
                 break;
+            case "getMobileDataStatus":
+                delegate.getMobileDataStatus(call, result);
+                break;
             case "ip":
                 delegate.getIP(call, result);
                 break;
