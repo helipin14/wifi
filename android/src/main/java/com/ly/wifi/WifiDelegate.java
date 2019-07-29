@@ -500,6 +500,7 @@ public class WifiDelegate implements PluginRegistry.RequestPermissionsResultList
     private void openConnection() {
         String ssid = methodCall.argument("ssid");
         disableAllNetwork(ssid);
+        int id = 0;
         if(!checkNetworkExist(ssid)) {
             Log.e(TAG, "Network doesn't exist, add config and connecting now...");
             WifiConfiguration config = new WifiConfiguration();
@@ -509,40 +510,29 @@ public class WifiDelegate implements PluginRegistry.RequestPermissionsResultList
             config.status = WifiConfiguration.Status.ENABLED;
             config.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
                 if(wifiManager != null) {
-                    int id = wifiManager.addNetwork(config);
+                    id = wifiManager.addNetwork(config);
                     Log.e(TAG, "Network ID : " + String.valueOf(id));
                     wifiManager.saveConfiguration();
-                    wifiManager.disconnect();
-                    wifiManager.enableNetwork(id, true);
-                    wifiManager.reconnect();
-                    try {
-                        while(!isConnected(activity.getApplicationContext())) {
-                            Thread.sleep(1000);
-                        }
-                        result.success(1);
-                        Log.e(TAG, "Successfully connected [Network doesn't exist]");
-                    } catch(Exception e) {
-                        e.printStackTrace();
-                    }
-                    clearMethodCallAndResult();
                 }
             } else {
                 Log.e(TAG, "Network is exist, auto connecting now ...");
-                int id = getNetworkId(ssid);
-                wifiManager.disconnect();
-                wifiManager.reconnect();
-                try {
-                    while(!isConnected(activity.getApplicationContext())) {
-                        Thread.sleep(1000);
-                    }
-                    result.success(1);
-                    Log.e(TAG, "Successfully connected [Network doesn't exist]");
-                } catch(Exception e) {
-                    e.printStackTrace();
-                }
-                clearMethodCallAndResult();
+                id = getNetworkId(ssid);
             }
+            wifiManager.enableNetwork(id, true);
+            wifiManager.disconnect();
+            wifiManager.reconnect();
+            try {
+                while(!isConnected(activity.getApplicationContext())) {
+                    Thread.sleep(1000);
+                }
+                result.success(1);
+                Log.e(TAG, "Successfully connected [Network doesn't exist]");
+            } catch(Exception e) {
+                e.printStackTrace();
+            }
+            clearMethodCallAndResult();
     }
+
 
     public void getMobileDataStatus(MethodCall methodCall, MethodChannel.Result result) {
         if (!setPendingMethodCallAndResult(methodCall, result)) {
