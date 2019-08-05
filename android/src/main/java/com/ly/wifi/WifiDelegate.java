@@ -514,23 +514,25 @@ public class WifiDelegate implements PluginRegistry.RequestPermissionsResultList
                     Log.e(TAG, "Network ID : " + String.valueOf(id));
                     wifiManager.saveConfiguration();
                 }
-            } else {
-                Log.e(TAG, "Network is exist, auto connecting now ...");
-                id = getNetworkId(ssid);
+        } else {
+            Log.e(TAG, "Network is exist, auto connecting now ...");
+            id = getNetworkId(ssid);
+        }
+        wifiManager.enableNetwork(id, true);
+        wifiManager.disconnect();
+        wifiManager.reconnect();
+        try {
+            while(!isConnected(activity.getApplicationContext())) {
+                Thread.sleep(1000);
             }
-            wifiManager.enableNetwork(id, true);
-            wifiManager.disconnect();
-            wifiManager.reconnect();
-            try {
-                while(!isConnected(activity.getApplicationContext())) {
-                    Thread.sleep(1000);
-                }
-                result.success(1);
-                Log.e(TAG, "Successfully connected [Network doesn't exist]");
-            } catch(Exception e) {
-                e.printStackTrace();
-            }
-            clearMethodCallAndResult();
+            Log.e(TAG, "SSID Connected right now : " + getSsid());
+            if(getSsid().equals(ssid)) result.success(1); 
+            else result.success(0);
+            Log.e(TAG, "Successfully connected [Network doesn't exist]");
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+        clearMethodCallAndResult();
     }
 
 
