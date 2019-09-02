@@ -60,6 +60,18 @@ public class WifiPlugin implements MethodCallHandler {
             case "connection":
                 delegate.connection(call, result);
                 break;
+            case "getListWifi":
+                delegate.getListWifi(call, result);
+                break;
+            case "forgetNetwork":
+                delegate.forgetNetwork(call, result);
+                break;
+            case "getGateway":
+                delegate.getGateway(call, result);
+                break;
+            case "getMobileDataStatus":
+                delegate.getMobileDataStatus(call, result);
+                break;
             default:
                 result.notImplemented();
                 break;

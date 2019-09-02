@@ -36,6 +36,7 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
     private PermissionManager permissionManager;
     private static final int REQUEST_ACCESS_FINE_LOCATION_PERMISSION = 1;
     private static final int REQUEST_CHANGE_WIFI_STATE_PERMISSION = 2;
+    private static final int REQUEST_ACCESS_COARSE_LOCATION_PERMISSION = 3;
     NetworkChangeReceiver networkReceiver;
 
     interface PermissionManager {
@@ -140,6 +141,109 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
         forgetNetwork();
     }
 
+    private boolean isGPSEnabled() {
+        LocationManager manager = (LocationManager) activity.getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
+        return manager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+    }
+
+
+    public void getListDataESP(MethodCall methodCall, MethodChannel.Result result) {
+        if (!setPendingMethodCallAndResult(methodCall, result)) {
+            finishWithAlreadyActiveError();
+            return;
+        }
+        if(isGPSEnabled()) {
+            if (!permissionManager.isPermissionGranted(Manifest.permission.ACCESS_COARSE_LOCATION)) {
+                permissionManager.askForPermission(Manifest.permission.ACCESS_COARSE_LOCATION, REQUEST_ACCESS_COARSE_LOCATION_PERMISSION);
+                return;
+            }   
+            getListESP();
+        } else {
+            turnOnTheGPS();
+        }
+    }
+
+    public void getListWifi(MethodCall methodCall, MethodChannel.Result result) {
+        if (!setPendingMethodCallAndResult(methodCall, result)) {
+            finishWithAlreadyActiveError();
+            return;
+        }
+        Log.e(TAG, "Is GPS Enabled : " + String.valueOf(isGPSEnabled()));
+        if(isGPSEnabled()) {
+            if (!permissionManager.isPermissionGranted(Manifest.permission.ACCESS_COARSE_LOCATION)) {
+                permissionManager.askForPermission(Manifest.permission.ACCESS_COARSE_LOCATION, REQUEST_ACCESS_COARSE_LOCATION_PERMISSION);
+                return;
+            }   
+            getListWifiNearby();
+        } else {
+            turnOnTheGPS();
+        }
+    }
+
+    private void getListWifiNearby() {
+        if(wifiManager != null) {
+            receiver = new ScanResultReceiver();
+            activity.registerReceiver(receiver, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+            Log.e(TAG, "Scanning nearby wifi...");
+            wifiManager.startScan();
+        }
+    }
+
+
+    private void getListESP() {
+        wifiReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                try {
+                    List<ScanResult> scanResult = wifiManager.getScanResults();
+                    JSONArray data = new JSONArray();
+                    info = wifiManager.getConnectionInfo();
+                    activity.unregisterReceiver(this);
+                    for(int i = 0; i < scanResult.size(); i++) {
+                        String ssid = scanResult.get(i).SSID;
+                        String status = "";
+                        String capabilities = scanResult.get(i).capabilities;
+                        if(ssid.replace("\"", "").indexOf("BLiving-") > -1) {
+                            data.put(count, ssid);
+                            count += 1;
+                        }
+                    }
+                    result.success(data.toString());
+                    clearMethodCallAndResult();
+                    count = 0;
+                } catch(Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        activity.registerReceiver(wifiReceiver, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+        Log.e(TAG, "Scanning nearby ESP ...");
+        wifiManager.startScan();
+    }
+
+    public void getGateway(MethodCall methodCall, MethodChannel.Result result) {
+        if (!setPendingMethodCallAndResult(methodCall, result)) {
+            finishWithAlreadyActiveError();
+            return;
+        }
+        getGateway();
+    }
+
+    private void getGateway() {
+        String gateway = "";
+        if(wifiManager != null) {
+            gateway = convertIp(wifiManager.getDhcpInfo().gateway);
+            if(!gateway.isEmpty()) {
+                result.success(gateway);
+                clearMethodCallAndResult();
+            } else {
+                finishWithError("unavailable", "Can't get the gateway!");
+            }
+        } else {
+            finishWithError("unavailable", "WifiManager is null!");
+        }
+    }
+
     private void forgetNetwork() {
         String ssid = methodCall.argument("ssid");
         if(wifiManager != null) {
@@ -200,7 +304,7 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
             return;
         }
         if (!permissionManager.isPermissionGranted(Manifest.permission.ACCESS_FINE_LOCATION)) {
-            permissionManager.askForPermission(Manifest.permission.ACCESS_FINE_LOCATION, REQUEST_ACCESS_FINE_LOCATION_PERMISSION);
+            permissionManager.askForPermission(Manifest.permission.ACCESS_FINE_LOCATION, REQUEST_ACCESS_COARSE_LOCATION_PERMISSION);
             return;
         }
         launchWifiList();
@@ -312,6 +416,42 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
         return null;
     }
 
+    public void getMobileDataStatus(MethodCall methodCall, MethodChannel.Result result) {
+        if (!setPendingMethodCallAndResult(methodCall, result)) {
+            finishWithAlreadyActiveError();
+            return;
+        }
+        // if (!permissionManager.isPermissionGranted(Manifest.permission.MODIFY_PHONE_STATE)) {
+        //     Log.e("MobileStatus", "Requesting permission...");
+        //     permissionManager.askForPermission(Manifest.permission.MODIFY_PHONE_STATE, REQUEST_CHANGE_MODIFY_PHONE_STATE);
+        //     return;
+        // }
+        // Log.e("MobileStatus", "Getting mobile data status....");
+        // getMobileDataState();
+        Log.e("MobileStatus", "Getting mobile data status....");
+        getMobileDataState();
+        // if(permissionManager.isPermissionGranted(Manifest.permission.MODIFY_PHONE_STATE)) {
+        // }
+    }
+
+    private void getMobileDataState() {
+        try {
+            TelephonyManager telephonyService = (TelephonyManager) activity.getApplicationContext().getSystemService(Context.TELEPHONY_SERVICE);
+            Method getMobileDataEnabledMethod = telephonyService.getClass().getDeclaredMethod("getDataEnabled");
+            if (null != getMobileDataEnabledMethod) {
+                boolean mobileDataEnabled = (Boolean) getMobileDataEnabledMethod.invoke(telephonyService);
+                result.success(mobileDataEnabled);
+            }
+        } catch (Exception ex) {
+            Log.e(TAG, "Error getting mobile data state", ex);
+        }
+        clearMethodCallAndResult();
+    }
+
+    private String getSsid() {
+        return wifiManager.getConnectionInfo().getSSID().replace("\"", "");
+    }
+
     private boolean setPendingMethodCallAndResult(MethodCall methodCall, MethodChannel.Result result) {
         if (this.result != null) {
             return false;
@@ -380,6 +520,57 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
             this.netId = netId;
             willLink = true;
             wifiManager.disconnect();
+        }
+    }
+
+    public class ScanResultReceiver extends BroadcastReceiver {
+
+        JSONArray data = new JSONArray();
+        List<ScanResult> scanResult = new ArrayList<>();
+    
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            try {
+                scanResult = wifiManager.getScanResults();
+                info = wifiManager.getConnectionInfo();
+                activity.unregisterReceiver(this);
+                for(int i = 0; i < scanResult.size(); i++) {
+                    String ssid = scanResult.get(i).SSID;
+                    String status = "";
+                    String capabilities = scanResult.get(i).capabilities;
+                    try {
+                        JSONObject isi = new JSONObject();
+                        if(ssid.equals(info.getSSID().replace("\"", ""))) status = "Connected";
+                        else status = "Not connected";
+                        isi.put("ssid", ssid);
+                        isi.put("status", status);
+                        isi.put("capabilities", capabilities);
+                        data.put(i, isi);
+                    } catch(JSONException e) {
+                        e.printStackTrace();
+                    }
+                }
+                result.success(data.toString());
+                clearMethodCallAndResult();
+            } catch(Exception e) {
+                e.printStackTrace();
+            }
+        }
+    
+        public JSONArray getData() { return this.data; }
+    
+        private int getLevel(int level) {
+            int result = 0;
+            if (level <= 0 && level >= -55) {
+                result = 1;
+            } else if (level < -55 && level >= -80) {
+                result = 2;
+            } else if (level < -80 && level >= -100) {
+                result = 3;
+            } else {
+                result = 0;
+            }
+            return result;
         }
     }
 }

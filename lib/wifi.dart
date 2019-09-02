@@ -52,6 +52,48 @@ class Wifi {
         return WifiState.error;
     }
   }
+
+  static Future<WifiState> forgetNetwork(String ssid) async {
+    int state = await _channel.invokeMethod("forgetNetwork", {'ssid':ssid});
+    switch (state) {
+      case 0:
+        return WifiState.error;
+      case 1:
+        return WifiState.success;
+      case 2:
+        return WifiState.already;
+      default:
+        return WifiState.error;
+    }
+  }
+
+  static Future<String> getListESP() async {
+    String result = await _channel.invokeMethod("getListESP");
+    if(result != null) {
+        if(result.isEmpty) {
+          return "Error";
+        }
+    }
+    return result;
+  }
+
+  static Future<String> getListWifi() async {
+    String result = await _channel.invokeMethod("getListWifi");
+    if(result != null) {
+        if(result.isEmpty) {
+          return "Error";
+        }
+    }
+    return result;
+  }
+
+  static Future<String> getGateway() async {
+    String gateway = await _channel.invokeMethod("getGateway");
+    if(gateway.isEmpty) {
+      return "Error";
+    }
+    return gateway;
+  }
 }
 
 class WifiResult {
