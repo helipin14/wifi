@@ -60,6 +60,7 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
     private ConnectivityManager connectivityManager;
     private BroadcastReceiver wifiReceiver;
     private int count = 0;
+    private String TAG = this.getClass().getSimpleName();
 
     interface PermissionManager {
         boolean isPermissionGranted(String permissionName);
