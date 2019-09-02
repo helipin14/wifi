@@ -203,8 +203,6 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
                 return;
             }   
             getListWifiNearby();
-        } else {
-            turnOnTheGPS();
         }
     }
 
