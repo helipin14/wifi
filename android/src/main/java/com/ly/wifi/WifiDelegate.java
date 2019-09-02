@@ -4,7 +4,9 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.BroadcastReceiver;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -13,6 +15,7 @@ import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
+import android.util.Log;
 
 import androidx.core.app.ActivityCompat;
 
@@ -29,6 +32,18 @@ import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.PluginRegistry;
 
+import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONException;
+
+import android.location.LocationManager;
+import android.content.IntentSender;
+import android.telephony.TelephonyManager;
+import java.lang.reflect.Method;
+
 public class
 WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
     private Activity activity;
@@ -38,6 +53,13 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
     private static final int REQUEST_CHANGE_WIFI_STATE_PERMISSION = 2;
     private static final int REQUEST_ACCESS_COARSE_LOCATION_PERMISSION = 3;
     NetworkChangeReceiver networkReceiver;
+    private ScanResultReceiver receiver;
+    private WifiInfo info;
+    private static final int REQUEST_CHECK = 100;
+    private static final int REQUEST_MOBILE_DATA = 200;
+    private ConnectivityManager connectivityManager;
+    private BroadcastReceiver wifiReceiver;
+    private int count = 0;
 
     interface PermissionManager {
         boolean isPermissionGranted(String permissionName);
@@ -103,6 +125,13 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
         }
     }
 
+    private String convertIp(int ip) {
+        return (ip & 0xFF) + "." +
+                ((ip >> 8) & 0xFF) + "." +
+                ((ip >> 16) & 0xFF) + "." +
+                ((ip >> 24) & 0xFF);
+    }
+
     private void launchLevel() {
         int level = wifiManager != null ? wifiManager.getConnectionInfo().getRssi() : 0;
         if (level != 0) {
@@ -158,8 +187,6 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
                 return;
             }   
             getListESP();
-        } else {
-            turnOnTheGPS();
         }
     }
 
@@ -244,6 +271,17 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
         }
     }
 
+    public int getNetworkId(String ssid) {
+        int netId = 0;
+        List<WifiConfiguration> list = wifiManager.getConfiguredNetworks();
+        for(WifiConfiguration config : list) {
+            if(config.SSID.replace("\"", "").equals(ssid)) {
+                netId = config.networkId;
+            }
+        }
+        return netId;
+    }
+
     private void forgetNetwork() {
         String ssid = methodCall.argument("ssid");
         if(wifiManager != null) {
@@ -260,6 +298,15 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
             }
         }
         clearMethodCallAndResult();
+    }
+
+    private boolean isConnected(Context context) {
+        connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = null;
+        if (connectivityManager != null) {
+            networkInfo = connectivityManager.getActiveNetworkInfo();
+        }
+        return networkInfo != null && networkInfo.getState() == NetworkInfo.State.CONNECTED;
     }
 
     private void launchIP() {
