@@ -94,6 +94,10 @@ class Wifi {
     }
     return gateway;
   }
+
+  static Future<bool> getMobileDataStatus() async {
+    return await _channel.invokeMethod("getMobileDataStatus");
+  }
 }
 
 class WifiResult {
