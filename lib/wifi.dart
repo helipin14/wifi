@@ -28,22 +28,7 @@ class Wifi {
     for (int i = 0; i < results.length; i++) {
       resultList.add(WifiResult(results[i]['ssid'], results[i]['level']));
     }
-    print("Data -> " + results.toString());
     return resultList;
-  }
-
-  static Future<bool> getMobileDataStatus() async {
-    return await _channel.invokeMethod("getMobileDataStatus");
-  }
-
-  static Future<String> getListESP() async {
-    String result = await _channel.invokeMethod("getListESP");
-    if(result != null) {
-        if(result.isEmpty) {
-          return "Error";
-        }
-    }
-    return result;
   }
 
   static Future<WifiState> connection(String ssid, String password) async {
@@ -52,73 +37,6 @@ class Wifi {
       'password': password,
     };
     int state = await _channel.invokeMethod('connection', params);
-    switch (state) {
-      case 0:
-        return WifiState.error;
-      case 1:
-        return WifiState.success;
-      case 2:
-        return WifiState.already;
-      default:
-        return WifiState.error;
-    }
-  }
-
-  static Future<WifiState> connectToOpenWifi(String ssid) async {
-    final Map<String, dynamic> params = {
-      'ssid':ssid
-    };
-    int state = await _channel.invokeMethod('openConnection', params);
-    switch (state) {
-      case 0:
-        return WifiState.error;
-      case 1:
-        return WifiState.success;
-      case 2:
-        return WifiState.already;
-      default:
-        return WifiState.error;
-    }
-  }
-
-  static Future<String> getGateway() async {
-    String gateway = await _channel.invokeMethod("getGateway");
-    if(gateway.isEmpty) {
-      return "Error";
-    }
-    return gateway;
-  }
-
-  static Future<String> getListWifi() async {
-    String result = await _channel.invokeMethod("getListWifi");
-    if(result != null) {
-        if(result.isEmpty) {
-          return "Error";
-        }
-    }
-    return result;
-  }
-
-  static Future<WifiState> forgetNetwork(String ssid) async {
-    int state = await _channel.invokeMethod("forgetNetwork", {'ssid':ssid});
-    switch (state) {
-      case 0:
-        return WifiState.error;
-      case 1:
-        return WifiState.success;
-      case 2:
-        return WifiState.already;
-      default:
-        return WifiState.error;
-    }
-  }
-
-  static Future<WifiState> connectToNetwork(String ssid, String pass) async {
-    var params = {
-      'ssid':ssid.trim(),
-      'pass':pass.trim(),
-    };
-    int state = await _channel.invokeMethod("connectToNetwork", params);
     switch (state) {
       case 0:
         return WifiState.error;

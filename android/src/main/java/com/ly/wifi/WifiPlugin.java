@@ -25,7 +25,6 @@ public class WifiPlugin implements MethodCallHandler {
         WifiManager wifiManager = (WifiManager) registrar.activeContext().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         final WifiDelegate delegate = new WifiDelegate(registrar.activity(), wifiManager);
         registrar.addRequestPermissionsResultListener(delegate);
-        registrar.addActivityResultListener(delegate);
 
         // support Android O,listen network disconnect event
         // https://stackoverflow.com/questions/50462987/android-o-wifimanager-enablenetwork-cannot-work
@@ -52,9 +51,6 @@ public class WifiPlugin implements MethodCallHandler {
             case "level":
                 delegate.getLevel(call, result);
                 break;
-            case "getMobileDataStatus":
-                delegate.getMobileDataStatus(call, result);
-                break;
             case "ip":
                 delegate.getIP(call, result);
                 break;
@@ -63,24 +59,6 @@ public class WifiPlugin implements MethodCallHandler {
                 break;
             case "connection":
                 delegate.connection(call, result);
-                break;
-            case "openConnection":
-                delegate.openConnection(call, result);
-                break;
-            case "getGateway":
-                delegate.getGateway(call, result);
-                break;
-            case "getListWifi":
-                delegate.getListWifi(call, result);
-                break;
-            case "connectToNetwork":
-                delegate.connectToNetwork(call, result);
-                break;
-            case "forgetNetwork":
-                delegate.forgetNetwork(call, result);
-                break;
-            case "getListESP":
-                delegate.getListDataESP(call, result);
                 break;
             default:
                 result.notImplemented();
