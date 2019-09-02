@@ -19,6 +19,10 @@ class Wifi {
     return await _channel.invokeMethod('ip');
   }
 
+  static Future<WifiState> forgetNetwork(String ssid) {
+    return await _channel.invokeMethod("forgetNetwork", ssid);
+  }
+
   static Future<List<WifiResult>> list(String key) async {
     final Map<String, dynamic> params = {
       'key': key,
