@@ -61,6 +61,7 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
     private BroadcastReceiver wifiReceiver;
     private int count = 0;
     private String TAG = this.getClass().getSimpleName();
+    private String gSSID = "";
 
     interface PermissionManager {
         boolean isPermissionGranted(String permissionName);
@@ -215,7 +216,6 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
         }
     }
 
-
     private void getListESP() {
         wifiReceiver = new BroadcastReceiver() {
             @Override
@@ -281,6 +281,11 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
         return netId;
     }
 
+    private void enableCurrentNetwork() {
+        int networkId = getNetworkId(wifiManager.getConnectionInfo().getSSID());
+        wifiManager.enableNetwork(networkId, true);
+    }
+
     private void forgetNetwork() {
         String ssid = methodCall.argument("ssid");
         if(wifiManager != null) {
@@ -290,11 +295,8 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
             int netId = getNetworkId(ssid);
             Log.e(TAG, "Network ID : " + String.valueOf(netId));
             Log.e(TAG, "Forget Network..");
-            if(wifiManager.removeNetwork(netId)) {
-                result.success(1);
-            } else {
-                result.success(0);
-            }
+            if(wifiManager.removeNetwork(netId)) result.success(1); 
+            else result.success(0);
         }
         clearMethodCallAndResult();
     }
@@ -362,6 +364,7 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
         if (wifiManager != null) {
             List<ScanResult> scanResultList = wifiManager.getScanResults();
             for (ScanResult scanResult : scanResultList) {
+                String status = "Not connected";
                 int level;
                 if (scanResult.level <= 0 && scanResult.level >= -55) {
                     level = 3;
@@ -372,9 +375,11 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
                 } else {
                     level = 0;
                 }
+                if(getSsid().equals(scanResult.SSID)) status = "Connected";
                 HashMap<String, Object> maps = new HashMap<>();
-                if (key.isEmpty()) {
+                if (key.equals("")) {
                     maps.put("ssid", scanResult.SSID);
+                    maps.put("status", status);
                     maps.put("level", level);
                     list.add(maps);
                 } else {
@@ -399,33 +404,64 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
             permissionManager.askForPermission(Manifest.permission.CHANGE_WIFI_STATE, REQUEST_ACCESS_FINE_LOCATION_PERMISSION);
             return;
         }
-        connection();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                connection();
+            }
+        }).start();
     }
 
     private void connection() {
         String ssid = methodCall.argument("ssid");
         String password = methodCall.argument("password");
-        WifiConfiguration wifiConfig = createWifiConfig(ssid, password);
-        if (wifiConfig == null) {
-            finishWithError("unavailable", "wifi config is null!");
-            return;
-        }
-        int netId = wifiManager.addNetwork(wifiConfig);
+        int netId = 0;
+        if(!ssid.equals("")) gSSID = ssid;
+        if(!checkNetworkExist(ssid)) {
+            WifiConfiguration wifiConfig = createWifiConfig(ssid, password);
+            if (wifiConfig == null) {
+                finishWithError("unavailable", "Wifi Configuration is null.");
+                result.success(0);
+                clearMethodCallAndResult();
+                return;
+            }
+            netId = wifiManager.addNetwork(wifiConfig);
+            wifiManager.saveConfiguration();
+        } else netId = getNetworkId(ssid);
+        
+        Log.e(TAG, "Network ID : " + String.valueOf(netId));
         if (netId == -1) {
             result.success(0);
             clearMethodCallAndResult();
         } else {
+            Log.e(TAG, "Connect to " + ssid);
             // support Android O
             // https://stackoverflow.com/questions/50462987/android-o-wifimanager-enablenetwork-cannot-work
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
                 wifiManager.enableNetwork(netId, true);
                 wifiManager.reconnect();
-                result.success(1);
-                clearMethodCallAndResult();
-            } else {
-                networkReceiver.connect(netId);
-            }
+                successConnected(gSSID);
+            } else networkReceiver.connect(netId);
         }
+    }
+
+    private void successConnected(String ssid) {
+        try {
+            while(!isConnected(activity.getApplicationContext())) {
+                Thread.sleep(1200);
+            }
+            if(wifiManager.getConnectionInfo().getSSID().replace("\"", "").equals(ssid)) result.success(1);
+            else result.success(0);
+            clearMethodCallAndResult();
+        } catch(Exception e) {e.printStackTrace();}
+    }
+
+    private boolean checkNetworkExist(String ssid) {
+        List<WifiConfiguration> list = wifiManager.getConfiguredNetworks();
+        for(WifiConfiguration config : list) {
+            if(config.SSID.replace("\"", "").equals(ssid.trim())) return true;
+        }
+        return false;
     }
 
     private WifiConfiguration createWifiConfig(String ssid, String Password) {
@@ -436,12 +472,9 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
         config.allowedKeyManagement.clear();
         config.allowedPairwiseCiphers.clear();
         config.allowedProtocols.clear();
-        WifiConfiguration tempConfig = isExist(wifiManager, ssid);
-        if (tempConfig != null) {
-            wifiManager.removeNetwork(tempConfig.networkId);
-        }
         config.preSharedKey = "\"" + Password + "\"";
         config.hiddenSSID = true;
+        config.priority = getHighestPriority() + 1;
         config.allowedAuthAlgorithms.set(WifiConfiguration.AuthAlgorithm.OPEN);
         config.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.TKIP);
         config.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_PSK);
@@ -452,10 +485,34 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
         return config;
     }
 
+    private int getHighestPriority() {
+        int highestPriority = 10;
+        if(wifiManager != null) {
+            List<WifiConfiguration> config = wifiManager.getConfiguredNetworks();
+            for(WifiConfiguration conf : config) {
+                if(conf.priority > highestPriority) highestPriority = conf.priority;
+            }
+        }
+        return highestPriority;
+    }
+
+    private static boolean getHexKey(String s) {
+        if (s == null) return false;
+        int len = s.length();
+        if (len != 10 && len != 26 && len != 58) return false;
+        for (int i = 0; i < len; ++i) {
+            char c = s.charAt(i);
+            if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) continue;
+            return false;
+        }
+        return true;
+    }
+
     private WifiConfiguration isExist(WifiManager wifiManager, String ssid) {
         List<WifiConfiguration> existingConfigs = wifiManager.getConfiguredNetworks();
         for (WifiConfiguration existingConfig : existingConfigs) {
             if (existingConfig.SSID.equals("\"" + ssid + "\"")) {
+                Log.e(TAG, "\n Wifi Configuration is exist. \n");
                 return existingConfig;
             }
         }
@@ -554,18 +611,18 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
         public void onReceive(Context context, Intent intent) {
             NetworkInfo info = intent.getParcelableExtra(ConnectivityManager.EXTRA_NETWORK_INFO);
             if (info.getState() == NetworkInfo.State.DISCONNECTED && willLink) {
+                Log.e(TAG, "Network ID Connection : " + String.valueOf(netId));
                 wifiManager.enableNetwork(netId, true);
                 wifiManager.reconnect();
-                result.success(1);
+                if(!gSSID.equals("")) successConnected(gSSID);
                 willLink = false;
-                clearMethodCallAndResult();
             }
         }
 
         public void connect(int netId) {
+            wifiManager.disconnect();
             this.netId = netId;
             willLink = true;
-            wifiManager.disconnect();
         }
     }
 
@@ -584,12 +641,14 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
                     String ssid = scanResult.get(i).SSID;
                     String status = "";
                     String capabilities = scanResult.get(i).capabilities;
+                    int level = scanResult.get(i).level;
                     try {
                         JSONObject isi = new JSONObject();
                         if(ssid.equals(info.getSSID().replace("\"", ""))) status = "Connected";
                         else status = "Not connected";
                         isi.put("ssid", ssid);
                         isi.put("status", status);
+                        isi.put("level", getLevel(level));
                         isi.put("capabilities", capabilities);
                         data.put(i, isi);
                     } catch(JSONException e) {

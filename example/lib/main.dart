@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:wifi/wifi.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 void main() => runApp(new MyApp());
 
@@ -25,16 +27,60 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  String _wifiName = 'click button to get wifi ssid.';
-  int level = 0;
-  String _ip = 'click button to get ip.';
-  List<WifiResult> ssidList = [];
-  String ssid = '', password = '';
+
+  List wifiList = List();
+  TextEditingController pass = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    loadData();
+    _loadData();
+  }
+
+  _loadData() async {
+    await Wifi.getListWifi().then((data) {
+      print("Data $data");
+      if(data.isNotEmpty || data != null) {
+        var res = jsonDecode(data);
+        setState(() {
+          for(int i = 0; i < res.length; i++) {
+            wifiList.add({
+              'ssid':res[i]['ssid'],
+              'status':res[i]['status'],
+              'level':res[i]['level']
+            });
+          }
+        });
+      }
+    });
+  }
+
+  _launchListWifi() async {
+    await Wifi.list("").then((data) {
+      for(int i = 0; i < data.length; i++) {
+        WifiResult result = data[i];
+        print(result.ssid);
+      }
+    });
+  }
+
+  Future<void> refresh() async {
+    wifiList.clear();
+    await Wifi.getListWifi().then((data) {
+      print("Data $data");
+      if(data.isNotEmpty || data != null) {
+        var res = jsonDecode(data);
+        setState(() {
+          for(int i = 0; i < res.length; i++) {
+            wifiList.add({
+              'ssid':res[i]['ssid'],
+              'status':res[i]['status'],
+              'level':res[i]['level']
+            });
+          }
+        });
+      }
+    });
   }
 
   @override
@@ -44,121 +90,67 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text('Wifi'),
         centerTitle: true,
       ),
-      body: SafeArea(
-        child: ListView.builder(
-          padding: EdgeInsets.all(8.0),
-          itemCount: ssidList.length + 1,
-          itemBuilder: (BuildContext context, int index) {
-            return itemSSID(index);
-          },
+      body: Container(
+        child: RefreshIndicator(
+          onRefresh: refresh,
+          child: ListView.builder(
+            itemCount: wifiList.length,
+            itemBuilder: (context, index) => _buildItem(index),
+          ),
         ),
-      ),
+      )
     );
   }
 
-  Widget itemSSID(index) {
-    if (index == 0) {
-      return Column(
-        children: [
-          Row(
-            children: <Widget>[
-              RaisedButton(
-                child: Text('ssid'),
-                onPressed: _getWifiName,
-              ),
-              Offstage(
-                offstage: level == 0,
-                child: Image.asset(level == 0 ? 'images/wifi1.png' : 'images/wifi$level.png', width: 28, height: 21),
-              ),
-              Text(_wifiName),
-            ],
+  _buildItem(index) => ListTile(
+    leading: Icon(_buildWifiIcon(wifiList[index]['level']), color: Colors.blue, size: 16,),
+    title: Text(wifiList[index]['ssid']),
+    subtitle: Text(wifiList[index]['status']),
+    onTap: () {
+      _showDialog(index);
+    },
+  );
+
+  _showDialog(int index) {
+    showDialog(
+      context: context,
+      builder: (context) => Center(
+        child: AlertDialog(
+          content: TextField(
+            autofocus: true,
+            controller: pass,
           ),
-          Row(
-            children: <Widget>[
-              RaisedButton(
-                child: Text('ip'),
-                onPressed: _getIP,
-              ),
-              Text(_ip),
-            ],
-          ),
-          TextField(
-            decoration: InputDecoration(
-              border: UnderlineInputBorder(),
-              filled: true,
-              icon: Icon(Icons.wifi),
-              hintText: 'Your wifi ssid',
-              labelText: 'ssid',
+          title: Text(wifiList[index]['ssid'],),
+          actions: <Widget>[
+            FlatButton(
+              child: Text("CONNECT"),
+              onPressed: () async {
+                WifiState state = await Wifi.connection(wifiList[index]['ssid'], pass.text.trim());
+                print("state index : ${state.index}");
+                Navigator.of(context, rootNavigator: true).pop();
+              },
             ),
-            keyboardType: TextInputType.text,
-            onChanged: (value) {
-              ssid = value;
-            },
-          ),
-          TextField(
-            decoration: InputDecoration(
-              border: UnderlineInputBorder(),
-              filled: true,
-              icon: Icon(Icons.lock_outline),
-              hintText: 'Your wifi password',
-              labelText: 'password',
-            ),
-            keyboardType: TextInputType.text,
-            onChanged: (value) {
-              password = value;
-            },
-          ),
-          RaisedButton(
-            child: Text('connection'),
-            onPressed: connection,
-          ),
-        ],
-      );
-    } else {
-      return Column(children: <Widget>[
-        ListTile(
-          leading: Image.asset('images/wifi${ssidList[index - 1].level}.png', width: 28, height: 21),
-          title: Text(
-            ssidList[index - 1].ssid,
-            style: TextStyle(
-              color: Colors.black87,
-              fontSize: 16.0,
-            ),
-          ),
-          dense: true,
+            FlatButton(
+              child: Text("CANCEL"),
+              onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+            )
+          ],
         ),
-        Divider(),
-      ]);
+      )
+    );
+  }
+
+ _buildWifiIcon(int level) {
+    IconData icon;
+    switch(level) {
+      case 1: icon = MdiIcons.wifiStrength1;
+        break;
+      case 2: icon = MdiIcons.wifiStrength2;
+        break;
+      case 3: icon = MdiIcons.wifiStrength3;
+        break;
+      default: icon = MdiIcons.wifi;     
     }
-  }
-
-  void loadData() async {
-    Wifi.list('').then((list) {
-      setState(() {
-        ssidList = list;
-      });
-    });
-  }
-
-  Future<Null> _getWifiName() async {
-    int l = await Wifi.level;
-    String wifiName = await Wifi.ssid;
-    setState(() {
-      level = l;
-      _wifiName = wifiName;
-    });
-  }
-
-  Future<Null> _getIP() async {
-    String ip = await Wifi.ip;
-    setState(() {
-      _ip = ip;
-    });
-  }
-
-  Future<Null> connection() async {
-    Wifi.connection(ssid, password).then((v) {
-      print(v);
-    });
+    return icon;
   }
 }
