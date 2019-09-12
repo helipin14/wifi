@@ -2,6 +2,7 @@
 #import <SystemConfiguration/CaptiveNetwork.h>
 #import <ifaddrs.h>
 #import <arpa/inet.h>
+#import "routerip.m"
 #import <NetworkExtension/NEHotspotConfigurationManager.h>
 
 @implementation WifiPlugin
@@ -26,6 +27,18 @@
     } else if ([@"level" isEqualToString:call.method]) {
         NSNumber *level = @([self getSignalStrength]);
         result(level);
+    } else if ([@"getGateway" isEqualToString:call.method]) {
+        
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(52 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            NSString *ip = [self getGatewayIP];
+            if ([ip isEqualToString: @"error"]) {
+                result([FlutterError errorWithCode:@"UNAVAILABLE"
+                                           message:@"Gateway unavailable"
+                                           details:nil]);
+            } else {
+                result(ip);
+            }
+        });
     } else if ([@"ip" isEqualToString:call.method]) {
         NSString *ip = [self getIPAddress];
         if ([ip isEqualToString: @"error"]) {
@@ -52,6 +65,34 @@
                     }
                 }
             }];
+        }
+    } else if ([@"openConnection" isEqualToString:call.method]) {
+             if (@available(iOS 11.0, *)) {
+                 NSDictionary* argsMap = call.arguments;
+                 NSString *ssid = argsMap[@"ssid"];
+                 //NSString *password = argsMap[@"password"];
+                 //NSString *password = argsMap[@""];
+                 NEHotspotConfiguration * hotspotConfig = [[NEHotspotConfiguration alloc] initWithSSID:ssid];
+                 [[NEHotspotConfigurationManager sharedManager] applyConfiguration:hotspotConfig completionHandler:^(NSError * _Nullable error) {
+                     if(error == nil){
+                         result(@1);
+                     }else{
+                         if(error.code == 13){
+                             result(@2);
+                         } else {
+                             result(@0);
+                         }
+                     }
+                 }];
+             }
+    } else if ([@"forgetNetwork" isEqualToString:call.method]) {
+        if (@available(iOS 11.0, *)) {
+            NSDictionary* argsMap = call.arguments;
+            NSString *ssid = argsMap[@"ssid"];
+            NEHotspotConfiguration * hotspotConfig = [[NEHotspotConfiguration alloc] initWithSSID:ssid];
+            [[NEHotspotConfigurationManager sharedManager] removeConfigurationForSSID:ssid];
+            result(@1);
+            NSLog(@"Network Remove Successfully");
         }
     } else {
         result(FlutterMethodNotImplemented);
@@ -107,4 +148,17 @@
     freeifaddrs(interfaces);
     return address;
 }
+
+
+- (NSString *)getGatewayIP {
+    
+        NSString *routerIpp = routerIP();
+        NSLog(@"%@",routerIpp);
+      
+    return routerIpp;
+   
+    
+}
+
+
 @end
