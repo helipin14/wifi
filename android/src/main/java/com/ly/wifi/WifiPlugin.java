@@ -72,6 +72,9 @@ public class WifiPlugin implements MethodCallHandler {
             case "getMobileDataStatus":
                 delegate.getMobileDataStatus(call, result);
                 break;
+            case "getListESP":
+                delegate.getListDataESP(call, result);
+                break;
             default:
                 result.notImplemented();
                 break;
