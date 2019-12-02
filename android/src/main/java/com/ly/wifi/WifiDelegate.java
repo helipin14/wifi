@@ -404,12 +404,7 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
             permissionManager.askForPermission(Manifest.permission.CHANGE_WIFI_STATE, REQUEST_ACCESS_FINE_LOCATION_PERMISSION);
             return;
         }
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                connection();
-            }
-        }).start();
+        connection();
     }
 
     private void connection() {
