@@ -381,11 +381,13 @@ WifiDelegate implements PluginRegistry.RequestPermissionsResultListener {
                     maps.put("ssid", scanResult.SSID);
                     maps.put("status", status);
                     maps.put("level", level);
+                    maps.put("frequency", scanResult.frequency);
                     list.add(maps);
                 } else {
                     if (scanResult.SSID.contains(key)) {
                         maps.put("ssid", scanResult.SSID);
                         maps.put("level", level);
+                        maps.put("frequency", scanResult.frequency);
                         list.add(maps);
                     }
                 }
