@@ -26,7 +26,7 @@ class Wifi {
     var results = await _channel.invokeMethod('list', params);
     List<WifiResult> resultList = [];
     for (int i = 0; i < results.length; i++) {
-      resultList.add(WifiResult(results[i]['ssid'], results[i]['level'], results[i]['status']));
+      resultList.add(WifiResult(results[i]['ssid'], results[i]['level'], results[i]['status'], results[i]['frequency']));
     }
     return resultList;
   }
@@ -98,7 +98,7 @@ class Wifi {
 
 class WifiResult {
   String ssid, status;
-  int level;
+  int level, frequency;
 
-  WifiResult(this.ssid, this.level, this.status);
+  WifiResult(this.ssid, this.level, this.status, this.frequency);
 }
